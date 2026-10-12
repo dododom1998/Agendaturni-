@@ -75,6 +75,7 @@ h1{font-family:var(--f-display);font-weight:700;font-size:46px;line-height:1;tex
 .chip[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .chip .cl{display:flex;flex-direction:column;line-height:1.15}
 .chip small{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.chip:disabled{opacity:.45;cursor:default}
 .dot{display:inline-block;flex:none;width:12px;height:12px;border-radius:3px;background:var(--c,var(--muted))}
 #brush{margin-bottom:12px}
 
@@ -84,11 +85,17 @@ h1{font-family:var(--f-display);font-weight:700;font-size:46px;line-height:1;tex
 .wd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px}
 .wd span{font-family:var(--f-display);font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center}
 .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.day{min-height:64px;min-width:0;padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:left}
+.day{position:relative;min-height:64px;min-width:0;padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:left}
 .day.has{background:var(--surface);border-color:var(--c);border-bottom:4px solid var(--c)}
 @supports (background:color-mix(in srgb,red 10%,white)){
   .day.has{background:color-mix(in srgb,var(--c) 26%,var(--surface));border-color:color-mix(in srgb,var(--c) 55%,var(--surface));border-bottom-color:var(--c)}
 }
+.day.has2{border:1px solid var(--line);background:var(--surface)}
+@supports (background:color-mix(in srgb,red 10%,white)){
+  .day.has2{background:linear-gradient(90deg,color-mix(in srgb,var(--c) 26%,var(--surface)) 50%,color-mix(in srgb,var(--c2) 26%,var(--surface)) 50%)}
+}
+.day.has2::after{content:"";position:absolute;left:-1px;right:-1px;bottom:-1px;height:4px;border-radius:0 0 6px 6px;background:linear-gradient(90deg,var(--c) 50%,var(--c2) 50%)}
+.day.has2 .sh{font-size:14px}
 .day .n{font-family:var(--f-display);font-weight:600;font-size:18px;line-height:1;align-self:flex-start}
 .day.today .n{background:var(--accent);color:var(--accent-ink);border-radius:4px;padding:2px 5px;margin:-2px 0 0 -2px}
 .day.sel{outline:2px solid var(--ink);outline-offset:1px}
@@ -208,6 +215,13 @@ let S={types:clone(DEF_TYPES),shifts:{},events:[]};
 const now=new Date();
 let Y=now.getFullYear(),M=now.getMonth(),view='month',brushOn=false,brush='m',sel=null,mode='day',byDate={};
 const typeOf=id=>S.types.find(t=>t.id===id);
+const dayIds=k=>(S.shifts[k]||[]).filter(id=>typeOf(id));
+const dayTypes=k=>dayIds(k).map(typeOf);
+function setDay(k,ids){
+  const o=S.types.map(t=>t.id);
+  ids=ids.filter((id,i)=>ids.indexOf(id)===i&&o.includes(id)).sort((a,b)=>o.indexOf(a)-o.indexOf(b)).slice(0,2);
+  if(ids.length)S.shifts[k]=ids;else delete S.shifts[k];
+}
 
 function norm(d){
   const o={
@@ -216,6 +230,14 @@ function norm(d){
     events:Array.isArray(d.events)?d.events.filter(e=>e&&e.id&&e.date&&typeof e.title==='string'):[]
   };
   if(!o.types.length)o.types=clone(DEF_TYPES);
+  const sh={};
+  for(const k in o.shifts){
+    const v=o.shifts[k];
+    const a=(Array.isArray(v)?v:[v]).filter(id=>typeof id==='string'&&o.types.some(t=>t.id===id));
+    const u=a.filter((id,i)=>a.indexOf(id)===i).slice(0,2);
+    if(u.length)sh[k]=u;
+  }
+  o.shifts=sh;
   return o;
 }
 
@@ -243,24 +265,24 @@ function groupEvents(){
   for(const k in g)g[k].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
   return g;
 }
-function chip(t,pressed,attr,val,small){
-  return '<button class="chip" style="--c:'+col(t.color)+'" data-'+attr+'="'+esc(val)+'" aria-pressed="'+pressed+'"><i class="dot"></i><span class="cl"><span>'+esc(t.name)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</span></button>';
+function chip(t,pressed,attr,val,small,dis){
+  return '<button class="chip" style="--c:'+col(t.color)+'" data-'+attr+'="'+esc(val)+'" aria-pressed="'+pressed+'"'+(dis?' disabled':'')+'><i class="dot"></i><span class="cl"><span>'+esc(t.name)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</span></button>';
 }
 function renderBrush(){
   $('#brush').innerHTML='<div class="chips">'+S.types.map(t=>chip(t,brush===t.id,'brush',t.id)).join('')+
     '<button class="chip" data-brush="erase" aria-pressed="'+(brush==='erase')+'"><span class="cl"><span>Gomma</span></span></button></div>'+
-    '<p class="hint">Scegli un turno, poi tocca i giorni da segnare.</p>';
+    '<p class="hint">Scegli un turno e tocca i giorni: un secondo tocco lo toglie. Puoi mettere fino a due turni al giorno.</p>';
 }
 function renderMonth(){
   const lead=(new Date(Y,M,1).getDay()+6)%7,n=new Date(Y,M+1,0).getDate(),tk=todayKey();
   let h='';
   for(let i=0;i<lead;i++)h+='<div></div>';
   for(let d=1;d<=n;d++){
-    const k=key(Y,M,d),t=typeOf(S.shifts[k]),ev=byDate[k]||[];
+    const k=key(Y,M,d),ts=dayTypes(k),t=ts[0],t2=ts[1],ev=byDate[k]||[];
     const dots=ev.slice(0,3).map(()=>'<i></i>').join('')+(ev.length>3?'<i></i>':'');
-    h+='<button class="day'+(t?' has':'')+(k===tk?' today':'')+(k===sel?' sel':'')+'" data-k="'+k+'"'+(t?' style="--c:'+col(t.color)+'"':'')+
-      ' aria-label="'+d+' '+MESI[M]+', '+(t?esc(t.name):'nessun turno')+', '+ev.length+' impegni">'+
-      '<span class="n">'+d+'</span><span class="foot"><span class="sh">'+(t?shortOf(t):'')+'</span><span class="dots">'+dots+'</span></span></button>';
+    h+='<button class="day'+(t?' has':'')+(t2?' has2':'')+(k===tk?' today':'')+(k===sel?' sel':'')+'" data-k="'+k+'"'+(t?' style="--c:'+col(t.color)+(t2?';--c2:'+col(t2.color):'')+'"':'')+
+      ' aria-label="'+d+' '+MESI[M]+', '+(ts.length?ts.map(x=>esc(x.name)).join(' e '):'nessun turno')+', '+ev.length+' impegni">'+
+      '<span class="n">'+d+'</span><span class="foot"><span class="sh">'+ts.map(x=>shortOf(x)).join('+')+'</span><span class="dots">'+dots+'</span></span></button>';
   }
   $('#grid').innerHTML=h;
 }
@@ -268,11 +290,11 @@ function renderAgenda(){
   const n=new Date(Y,M+1,0).getDate(),tk=todayKey();
   let h='';
   for(let d=1;d<=n;d++){
-    const k=key(Y,M,d),t=typeOf(S.shifts[k]),ev=byDate[k]||[];
-    if(!t&&!ev.length)continue;
+    const k=key(Y,M,d),ts=dayTypes(k),ev=byDate[k]||[];
+    if(!ts.length&&!ev.length)continue;
     const dt=new Date(Y,M,d);
     h+='<button class="row'+(k<tk?' past':'')+'" data-k="'+k+'"><div class="dt"><span>'+GS[dt.getDay()]+'</span><b>'+d+'</b></div><div class="rbody">'+
-      (t?'<div class="rshift" style="--c:'+col(t.color)+'"><i class="dot"></i><strong>'+esc(t.name)+'</strong><span>'+esc(range(t))+'</span></div>':'')+
+      ts.map(t=>'<div class="rshift" style="--c:'+col(t.color)+'"><i class="dot"></i><strong>'+esc(t.name)+'</strong><span>'+esc(range(t))+'</span></div>').join('')+
       ev.map(e=>'<div class="rev"><span class="tm">'+(e.time||'tutto il giorno')+'</span> '+esc(e.title)+'</div>').join('')+'</div></button>';
   }
   $('#agendaView').innerHTML=h||'<p class="hint pad">Nessun turno o impegno a '+MESI[M]+'.</p>';
@@ -281,8 +303,8 @@ function renderSummary(){
   const n=new Date(Y,M+1,0).getDate(),cnt={};
   let hours=0,ne=0;
   for(let d=1;d<=n;d++){
-    const k=key(Y,M,d),t=typeOf(S.shifts[k]);
-    if(t){cnt[t.id]=(cnt[t.id]||0)+1;hours+=dur(t)}
+    const k=key(Y,M,d);
+    dayTypes(k).forEach(t=>{cnt[t.id]=(cnt[t.id]||0)+1;hours+=dur(t)});
     ne+=(byDate[k]||[]).length;
   }
   const pills=S.types.filter(t=>cnt[t.id]).map(t=>'<span class="pill" style="--c:'+col(t.color)+'"><i class="dot"></i>'+esc(t.name)+' <b>'+cnt[t.id]+'</b></span>').join('');
@@ -319,10 +341,11 @@ function renderSheet(){
       '<button class="btn primary" data-act="addtype">Aggiungi turno</button>';
     return;
   }
-  const dt=parseKey(sel),cur=S.shifts[sel],ev=byDate[sel]||[];
+  const dt=parseKey(sel),ids=dayIds(sel),ev=byDate[sel]||[];
   body.innerHTML='<div class="sh-head"><h2>'+GIORNI[dt.getDay()]+' '+dt.getDate()+' '+MESI[dt.getMonth()]+'</h2><button class="x" data-act="close" aria-label="Chiudi">×</button></div>'+
-    '<h3>Turno</h3><div class="chips">'+S.types.map(t=>chip(t,cur===t.id,'shift',t.id,range(t))).join('')+
-    '<button class="chip" data-shift="none" aria-pressed="'+(!cur)+'"><span class="cl"><span>Nessuno</span></span></button></div>'+
+    '<h3>Turno</h3><div class="chips">'+S.types.map(t=>chip(t,ids.includes(t.id),'shift',t.id,range(t),ids.length>=2&&!ids.includes(t.id))).join('')+
+    '<button class="chip" data-shift="none" aria-pressed="'+(!ids.length)+'"><span class="cl"><span>Nessuno</span></span></button></div>'+
+    '<p class="hint">'+(ids.length>=2?'Hai già due turni. Togline uno per sceglierne un altro.':'Puoi scegliere fino a due turni nello stesso giorno.')+'</p>'+
     '<h3>Impegni</h3>'+
     (ev.length?'<ul class="evs">'+ev.map(e=>'<li><span class="tm">'+(e.time||'—')+'</span><span class="et"><b>'+esc(e.title)+'</b>'+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</span><button class="x" data-act="delev" data-id="'+esc(e.id)+'" aria-label="Elimina '+esc(e.title)+'">×</button></li>').join('')+'</ul>':'<p class="hint">Nessun impegno in questo giorno.</p>')+
     '<form id="evForm" autocomplete="off"><label for="evTitle">Nuovo impegno</label>'+
@@ -358,7 +381,12 @@ $('#grid').addEventListener('click',e=>{
   const b=e.target.closest('.day');if(!b)return;
   const k=b.dataset.k;
   if(brushOn){
-    if(brush==='erase')delete S.shifts[k];else S.shifts[k]=brush;
+    if(brush==='erase')setDay(k,[]);
+    else{
+      const ids=dayIds(k);
+      if(ids.includes(brush))setDay(k,ids.filter(x=>x!==brush));
+      else setDay(k,ids.length<2?ids.concat(brush):[ids[0],brush]);
+    }
     persist();renderMain();
   }else openSheet('day',k);
 });
@@ -368,7 +396,10 @@ $('#agendaView').addEventListener('click',e=>{
 $('#layer').addEventListener('click',e=>{
   const a=e.target.closest('[data-act]'),sh=e.target.closest('[data-shift]');
   if(sh&&sel){
-    if(sh.dataset.shift==='none')delete S.shifts[sel];else S.shifts[sel]=sh.dataset.shift;
+    const v=sh.dataset.shift,ids=dayIds(sel);
+    if(v==='none')setDay(sel,[]);
+    else if(ids.includes(v))setDay(sel,ids.filter(x=>x!==v));
+    else if(ids.length<2)setDay(sel,ids.concat(v));
     persist();renderMain();renderSheet();return;
   }
   if(!a)return;
@@ -387,7 +418,7 @@ $('#layer').addEventListener('click',e=>{
     if(a.dataset.armed){
       const id=a.closest('.trow').dataset.id;
       S.types=S.types.filter(t=>t.id!==id);
-      for(const k in S.shifts)if(S.shifts[k]===id)delete S.shifts[k];
+      for(const k in S.shifts)setDay(k,S.shifts[k].filter(x=>x!==id));
       persist();renderMain();renderSheet();
     }else{
       a.dataset.armed='1';a.textContent='Elimina?';a.classList.add('danger');
@@ -436,5 +467,6 @@ setNote('local');
   }catch(e){setNote('local')}
 })();
 </script>
+
 </body>
 </html>
