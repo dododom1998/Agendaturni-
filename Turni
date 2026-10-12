@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Turni">
+<style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+<title>Turni e Impegni</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: colonna stretta stile tabellone turni. Griglia mensile al centro, foglio inferiore per giorno e turni. */
+:root{
+  --bg:#F1F4F3;
+  --surface:#FFFFFF;
+  --ink:#14211E;
+  --muted:#5E6F6B;
+  --line:#D9E1DF;
+  --accent:#0E6B61;
+  --accent-ink:#FFFFFF;
+  --danger:#B3261E;
+  --scrim:rgba(10,20,18,.45);
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1715;--surface:#18231F;--ink:#E7EFEC;--muted:#93A6A1;--line:#2A3A36;
+    --accent:#4FC3B3;--accent-ink:#06211D;--danger:#F2B8B5;--scrim:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1715;--surface:#18231F;--ink:#E7EFEC;--muted:#93A6A1;--line:#2A3A36;
+  --accent:#4FC3B3;--accent-ink:#06211D;--danger:#F2B8B5;--scrim:rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4;padding-inline:16px;padding-block:12px 32px}
+.app{max-width:520px;margin:0 auto}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+input{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0;min-height:44px}
+input[type=color]{padding:3px;width:44px;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0}
+.hint{color:var(--muted);font-size:14px;margin:8px 0 0}
+.hint.pad{padding:24px 0}
+
+/* intestazione */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font-family:var(--f-display);font-weight:700;font-size:46px;line-height:1;text-transform:uppercase;letter-spacing:.02em}
+#yearTitle{font-family:var(--f-display);font-weight:500;font-size:22px;color:var(--muted);margin-left:8px}
+.nav{display:flex;gap:6px}
+.nav button{min-width:44px;height:44px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-size:20px;padding:0 10px}
+.nav #today{font-size:15px;font-weight:500}
+
+/* barra comandi */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{padding:10px 14px;min-height:42px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 14px;min-height:44px;font-weight:500}
+.btn[aria-pressed="true"],.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary{width:100%;margin-top:12px;font-weight:600}
+
+/* turni scelti */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;min-height:44px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);text-align:left}
+.chip[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.chip .cl{display:flex;flex-direction:column;line-height:1.15}
+.chip small{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.dot{display:inline-block;flex:none;width:12px;height:12px;border-radius:3px;background:var(--c,var(--muted))}
+#brush{margin-bottom:12px}
+
+.empty{border:1px dashed var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px;color:var(--muted);font-size:15px}
+
+/* griglia del mese */
+.wd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px}
+.wd span{font-family:var(--f-display);font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.day{min-height:64px;min-width:0;padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:left}
+.day.has{background:var(--surface);border-color:var(--c);border-bottom:4px solid var(--c)}
+@supports (background:color-mix(in srgb,red 10%,white)){
+  .day.has{background:color-mix(in srgb,var(--c) 26%,var(--surface));border-color:color-mix(in srgb,var(--c) 55%,var(--surface));border-bottom-color:var(--c)}
+}
+.day .n{font-family:var(--f-display);font-weight:600;font-size:18px;line-height:1;align-self:flex-start}
+.day.today .n{background:var(--accent);color:var(--accent-ink);border-radius:4px;padding:2px 5px;margin:-2px 0 0 -2px}
+.day.sel{outline:2px solid var(--ink);outline-offset:1px}
+.day .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:2px}
+.day .sh{font-family:var(--f-display);font-weight:700;font-size:16px;line-height:1}
+.dots{display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;margin-left:auto}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--ink)}
+
+/* agenda */
+.row{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;width:100%;padding:12px 0;border-top:1px solid var(--line);text-align:left}
+.row.past{opacity:.55}
+.dt{font-family:var(--f-display);text-align:center;line-height:1}
+.dt span{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.dt b{display:block;font-size:32px;font-weight:600}
+.rbody{display:flex;flex-direction:column;gap:4px;min-width:0}
+.rshift{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rshift span,.tm{color:var(--muted);font-variant-numeric:tabular-nums}
+.rev{overflow-wrap:anywhere}
+.rev .tm{display:inline-block;min-width:3.2em;font-size:14px}
+
+/* riepilogo */
+.summary{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.summary h2{font-family:var(--f-display);font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.pills{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px}
+.pill{display:inline-flex;align-items:center;gap:6px}
+.pill b{font-variant-numeric:tabular-nums}
+.tot{display:flex;gap:32px;margin:14px 0 0}
+.tot dt{font-size:13px;color:var(--muted)}
+.tot dd{margin:0;font-family:var(--f-display);font-size:34px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.note{margin:20px 0 0;font-size:13px;color:var(--muted)}
+
+/* foglio */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:10}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:88%;overflow:auto;z-index:11;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+.sh-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.sh-head h2{font-family:var(--f-display);font-size:28px;font-weight:700;line-height:1.05;text-transform:capitalize}
+.sheet h3{font-family:var(--f-display);font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 8px}
+.x{min-width:44px;height:44px;border-radius:8px;border:1px solid var(--line);font-size:20px;line-height:1;flex:none;padding:0 8px}
+.x.danger{color:var(--danger);border-color:var(--danger);font-size:14px;font-weight:600;padding:0 10px}
+.evs{list-style:none;margin:0;padding:0}
+.evs li{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.et{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
+.et small{color:var(--muted)}
+form label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.two{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px}
+.trow{display:grid;grid-template-columns:44px minmax(0,1fr) 56px auto;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.trow .times{grid-column:2 / 4;display:flex;align-items:center;gap:8px}
+.trow .short{text-align:center;text-transform:uppercase}
+</style>
+
+<div class="app">
+  <header class="top">
+    <h1><span id="monthTitle"></span><span id="yearTitle"></span></h1>
+    <div class="nav">
+      <button id="prev" aria-label="Mese precedente">‹</button>
+      <button id="today">Oggi</button>
+      <button id="next" aria-label="Mese successivo">›</button>
+    </div>
+  </header>
+
+  <div class="bar">
+    <div class="seg">
+      <button data-view="month" aria-pressed="true">Mese</button>
+      <button data-view="agenda" aria-pressed="false">Agenda</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn" id="brushToggle" aria-pressed="false">Compila turni</button>
+    <button class="btn" id="typesBtn">Turni</button>
+  </div>
+
+  <div id="brush" hidden></div>
+  <p class="empty" id="empty" hidden>Qui compariranno i tuoi turni e gli impegni. Tocca un giorno per aggiungere un impegno o scegliere il turno, oppure usa Compila turni per segnare più giorni di seguito.</p>
+
+  <section id="monthView">
+    <div class="wd"><span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+  <section id="agendaView" hidden></section>
+
+  <section class="summary" id="summary"></section>
+  <p class="note" id="saveNote"></p>
+</div>
+
+<div id="layer" hidden>
+  <div class="scrim" data-act="close"></div>
+  <div class="sheet" id="sheetBody" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+const MESI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+const GIORNI=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+const GS=['dom','lun','mar','mer','gio','ven','sab'];
+const DEF_TYPES=[
+  {id:'m',name:'Mattina',short:'M',start:'06:00',end:'14:00',color:'#E0A100'},
+  {id:'p',name:'Pomeriggio',short:'P',start:'14:00',end:'22:00',color:'#E2662C'},
+  {id:'n',name:'Notte',short:'N',start:'22:00',end:'06:00',color:'#4B57C9'},
+  {id:'r',name:'Riposo',short:'R',start:'',end:'',color:'#7B8B87'},
+  {id:'f',name:'Ferie',short:'F',start:'',end:'',color:'#2A9468'}
+];
+const LS='turni-impegni-v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const key=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
+const todayKey=()=>{const t=new Date();return key(t.getFullYear(),t.getMonth(),t.getDate())};
+const parseKey=k=>{const a=k.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
+const col=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'#7B8B87';
+const clone=o=>JSON.parse(JSON.stringify(o));
+const mins=s=>{const a=s.split(':').map(Number);return a[0]*60+a[1]};
+const dur=t=>{if(!t.start||!t.end)return 0;let d=mins(t.end)-mins(t.start);if(d<=0)d+=1440;return d/60};
+const fmtH=h=>h.toLocaleString('it-IT',{maximumFractionDigits:1});
+const range=t=>t.start&&t.end?t.start+'–'+t.end:'Giorno libero';
+const shortOf=t=>esc(t.short||(t.name||'?').slice(0,1));
+
+let S={types:clone(DEF_TYPES),shifts:{},events:[]};
+const now=new Date();
+let Y=now.getFullYear(),M=now.getMonth(),view='month',brushOn=false,brush='m',sel=null,mode='day',byDate={};
+const typeOf=id=>S.types.find(t=>t.id===id);
+
+function norm(d){
+  const o={
+    types:Array.isArray(d.types)?d.types.filter(t=>t&&t.id&&typeof t.name==='string'):[],
+    shifts:d.shifts&&typeof d.shifts==='object'?d.shifts:{},
+    events:Array.isArray(d.events)?d.events.filter(e=>e&&e.id&&e.date&&typeof e.title==='string'):[]
+  };
+  if(!o.types.length)o.types=clone(DEF_TYPES);
+  return o;
+}
+
+/* ---------- salvataggio ---------- */
+let ref=null,timer=null,writing=false,dirty=false;
+function setNote(s){
+  $('#saveNote').textContent=s==='db'?'Salvato nel tuo account: ritrovi gli stessi dati su ogni dispositivo.':
+    s==='err'?'Salvataggio non riuscito. Riprova tra poco.':
+    'Salvato solo su questo dispositivo.';
+}
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+function persist(){saveLocal();dirty=true;clearTimeout(timer);timer=setTimeout(flush,500)}
+async function flush(){
+  if(!ref||writing||!dirty)return;
+  writing=true;dirty=false;
+  try{await ref.set(clone(S));setNote('db')}catch(e){setNote('err')}
+  writing=false;
+  if(dirty)flush();
+}
+
+/* ---------- disegno ---------- */
+function groupEvents(){
+  const g={};
+  S.events.forEach(e=>{(g[e.date]=g[e.date]||[]).push(e)});
+  for(const k in g)g[k].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  return g;
+}
+function chip(t,pressed,attr,val,small){
+  return '<button class="chip" style="--c:'+col(t.color)+'" data-'+attr+'="'+esc(val)+'" aria-pressed="'+pressed+'"><i class="dot"></i><span class="cl"><span>'+esc(t.name)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</span></button>';
+}
+function renderBrush(){
+  $('#brush').innerHTML='<div class="chips">'+S.types.map(t=>chip(t,brush===t.id,'brush',t.id)).join('')+
+    '<button class="chip" data-brush="erase" aria-pressed="'+(brush==='erase')+'"><span class="cl"><span>Gomma</span></span></button></div>'+
+    '<p class="hint">Scegli un turno, poi tocca i giorni da segnare.</p>';
+}
+function renderMonth(){
+  const lead=(new Date(Y,M,1).getDay()+6)%7,n=new Date(Y,M+1,0).getDate(),tk=todayKey();
+  let h='';
+  for(let i=0;i<lead;i++)h+='<div></div>';
+  for(let d=1;d<=n;d++){
+    const k=key(Y,M,d),t=typeOf(S.shifts[k]),ev=byDate[k]||[];
+    const dots=ev.slice(0,3).map(()=>'<i></i>').join('')+(ev.length>3?'<i></i>':'');
+    h+='<button class="day'+(t?' has':'')+(k===tk?' today':'')+(k===sel?' sel':'')+'" data-k="'+k+'"'+(t?' style="--c:'+col(t.color)+'"':'')+
+      ' aria-label="'+d+' '+MESI[M]+', '+(t?esc(t.name):'nessun turno')+', '+ev.length+' impegni">'+
+      '<span class="n">'+d+'</span><span class="foot"><span class="sh">'+(t?shortOf(t):'')+'</span><span class="dots">'+dots+'</span></span></button>';
+  }
+  $('#grid').innerHTML=h;
+}
+function renderAgenda(){
+  const n=new Date(Y,M+1,0).getDate(),tk=todayKey();
+  let h='';
+  for(let d=1;d<=n;d++){
+    const k=key(Y,M,d),t=typeOf(S.shifts[k]),ev=byDate[k]||[];
+    if(!t&&!ev.length)continue;
+    const dt=new Date(Y,M,d);
+    h+='<button class="row'+(k<tk?' past':'')+'" data-k="'+k+'"><div class="dt"><span>'+GS[dt.getDay()]+'</span><b>'+d+'</b></div><div class="rbody">'+
+      (t?'<div class="rshift" style="--c:'+col(t.color)+'"><i class="dot"></i><strong>'+esc(t.name)+'</strong><span>'+esc(range(t))+'</span></div>':'')+
+      ev.map(e=>'<div class="rev"><span class="tm">'+(e.time||'tutto il giorno')+'</span> '+esc(e.title)+'</div>').join('')+'</div></button>';
+  }
+  $('#agendaView').innerHTML=h||'<p class="hint pad">Nessun turno o impegno a '+MESI[M]+'.</p>';
+}
+function renderSummary(){
+  const n=new Date(Y,M+1,0).getDate(),cnt={};
+  let hours=0,ne=0;
+  for(let d=1;d<=n;d++){
+    const k=key(Y,M,d),t=typeOf(S.shifts[k]);
+    if(t){cnt[t.id]=(cnt[t.id]||0)+1;hours+=dur(t)}
+    ne+=(byDate[k]||[]).length;
+  }
+  const pills=S.types.filter(t=>cnt[t.id]).map(t=>'<span class="pill" style="--c:'+col(t.color)+'"><i class="dot"></i>'+esc(t.name)+' <b>'+cnt[t.id]+'</b></span>').join('');
+  $('#summary').innerHTML='<h2>Riepilogo di '+MESI[M]+'</h2>'+
+    (pills?'<div class="pills">'+pills+'</div>':'<p class="hint">Nessun turno segnato in questo mese.</p>')+
+    '<dl class="tot"><div><dt>Ore di lavoro</dt><dd>'+fmtH(hours)+' h</dd></div><div><dt>Impegni</dt><dd>'+ne+'</dd></div></dl>';
+}
+function renderMain(){
+  if(brush!=='erase'&&!typeOf(brush))brush=S.types[0]?S.types[0].id:'erase';
+  $('#monthTitle').textContent=MESI[M];
+  $('#yearTitle').textContent=Y;
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===view));
+  $('#monthView').hidden=view!=='month';
+  $('#agendaView').hidden=view!=='agenda';
+  $('#brushToggle').setAttribute('aria-pressed',brushOn);
+  $('#brush').hidden=!brushOn;
+  $('#empty').hidden=Object.keys(S.shifts).length+S.events.length>0;
+  if(brushOn)renderBrush();
+  byDate=groupEvents();
+  if(view==='month')renderMonth();else renderAgenda();
+  renderSummary();
+}
+function renderSheet(){
+  const body=$('#sheetBody');
+  if(mode==='types'){
+    body.innerHTML='<div class="sh-head"><h2>I tuoi turni</h2><button class="x" data-act="close" aria-label="Chiudi">×</button></div>'+
+      '<p class="hint">Gli orari servono a calcolare le ore. Lascia vuoti gli orari dei giorni liberi.</p>'+
+      S.types.map(t=>'<div class="trow" data-id="'+esc(t.id)+'">'+
+        '<input type="color" data-f="color" value="'+col(t.color)+'" aria-label="Colore">'+
+        '<input data-f="name" value="'+esc(t.name)+'" maxlength="24" aria-label="Nome del turno">'+
+        '<input data-f="short" class="short" value="'+esc(t.short||'')+'" maxlength="2" aria-label="Sigla">'+
+        '<button class="x" data-act="deltype" aria-label="Elimina turno">×</button>'+
+        '<div class="times"><input type="time" data-f="start" value="'+esc(t.start||'')+'" aria-label="Inizio"><span>–</span><input type="time" data-f="end" value="'+esc(t.end||'')+'" aria-label="Fine"></div></div>').join('')+
+      '<button class="btn primary" data-act="addtype">Aggiungi turno</button>';
+    return;
+  }
+  const dt=parseKey(sel),cur=S.shifts[sel],ev=byDate[sel]||[];
+  body.innerHTML='<div class="sh-head"><h2>'+GIORNI[dt.getDay()]+' '+dt.getDate()+' '+MESI[dt.getMonth()]+'</h2><button class="x" data-act="close" aria-label="Chiudi">×</button></div>'+
+    '<h3>Turno</h3><div class="chips">'+S.types.map(t=>chip(t,cur===t.id,'shift',t.id,range(t))).join('')+
+    '<button class="chip" data-shift="none" aria-pressed="'+(!cur)+'"><span class="cl"><span>Nessuno</span></span></button></div>'+
+    '<h3>Impegni</h3>'+
+    (ev.length?'<ul class="evs">'+ev.map(e=>'<li><span class="tm">'+(e.time||'—')+'</span><span class="et"><b>'+esc(e.title)+'</b>'+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</span><button class="x" data-act="delev" data-id="'+esc(e.id)+'" aria-label="Elimina '+esc(e.title)+'">×</button></li>').join('')+'</ul>':'<p class="hint">Nessun impegno in questo giorno.</p>')+
+    '<form id="evForm" autocomplete="off"><label for="evTitle">Nuovo impegno</label>'+
+    '<input id="evTitle" required maxlength="80" placeholder="Titolo, per esempio dentista">'+
+    '<div class="two"><div><label for="evTime">Ora</label><input id="evTime" type="time"></div><div><label for="evNote">Nota</label><input id="evNote" maxlength="120"></div></div>'+
+    '<button class="btn primary" type="submit">Aggiungi impegno</button></form>';
+}
+function render(){renderMain();if(!$('#layer').hidden)renderSheet()}
+
+function openSheet(m,k){
+  mode=m;sel=k||null;
+  renderMain();renderSheet();
+  $('#layer').hidden=false;
+  $('#sheetBody').scrollTop=0;
+}
+function closeSheet(){
+  $('#layer').hidden=true;sel=null;
+  renderMain();
+}
+
+/* ---------- eventi ---------- */
+$('#prev').onclick=()=>{M--;if(M<0){M=11;Y--}renderMain()};
+$('#next').onclick=()=>{M++;if(M>11){M=0;Y++}renderMain()};
+$('#today').onclick=()=>{const t=new Date();Y=t.getFullYear();M=t.getMonth();renderMain()};
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{view=b.dataset.view;renderMain()});
+$('#brushToggle').onclick=()=>{brushOn=!brushOn;if(brushOn&&view!=='month')view='month';renderMain()};
+$('#typesBtn').onclick=()=>openSheet('types');
+$('#brush').addEventListener('click',e=>{
+  const b=e.target.closest('[data-brush]');if(!b)return;
+  brush=b.dataset.brush;renderMain();
+});
+$('#grid').addEventListener('click',e=>{
+  const b=e.target.closest('.day');if(!b)return;
+  const k=b.dataset.k;
+  if(brushOn){
+    if(brush==='erase')delete S.shifts[k];else S.shifts[k]=brush;
+    persist();renderMain();
+  }else openSheet('day',k);
+});
+$('#agendaView').addEventListener('click',e=>{
+  const b=e.target.closest('.row');if(b)openSheet('day',b.dataset.k);
+});
+$('#layer').addEventListener('click',e=>{
+  const a=e.target.closest('[data-act]'),sh=e.target.closest('[data-shift]');
+  if(sh&&sel){
+    if(sh.dataset.shift==='none')delete S.shifts[sel];else S.shifts[sel]=sh.dataset.shift;
+    persist();renderMain();renderSheet();return;
+  }
+  if(!a)return;
+  const act=a.dataset.act;
+  if(act==='close')closeSheet();
+  else if(act==='delev'){
+    S.events=S.events.filter(x=>x.id!==a.dataset.id);
+    persist();renderMain();renderSheet();
+  }else if(act==='addtype'){
+    S.types.push({id:'t'+Date.now().toString(36),name:'Nuovo turno',short:'T',start:'08:00',end:'16:00',color:'#0E6B61'});
+    persist();renderMain();renderSheet();
+    const rows=document.querySelectorAll('.trow');
+    const last=rows[rows.length-1];
+    if(last){const i=last.querySelector('[data-f=name]');i.focus();i.select()}
+  }else if(act==='deltype'){
+    if(a.dataset.armed){
+      const id=a.closest('.trow').dataset.id;
+      S.types=S.types.filter(t=>t.id!==id);
+      for(const k in S.shifts)if(S.shifts[k]===id)delete S.shifts[k];
+      persist();renderMain();renderSheet();
+    }else{
+      a.dataset.armed='1';a.textContent='Elimina?';a.classList.add('danger');
+      setTimeout(()=>{if(a.isConnected){delete a.dataset.armed;a.textContent='×';a.classList.remove('danger')}},3000);
+    }
+  }
+});
+$('#sheetBody').addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;
+  const row=e.target.closest('.trow'),t=row&&typeOf(row.dataset.id);
+  if(!t)return;
+  t[f]=e.target.value;
+  persist();renderMain();
+});
+$('#sheetBody').addEventListener('submit',e=>{
+  e.preventDefault();
+  const title=$('#evTitle').value.trim();
+  if(!title||!sel)return;
+  S.events.push({id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:sel,title:title,time:$('#evTime').value,note:$('#evNote').value.trim()});
+  persist();renderMain();renderSheet();
+  $('#evTitle').focus();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#layer').hidden)closeSheet()});
+
+/* ---------- avvio ---------- */
+try{const t=localStorage.getItem(LS);if(t)S=norm(JSON.parse(t))}catch(e){}
+brush=S.types[0].id;
+renderMain();
+setNote('local');
+(async()=>{
+  try{
+    if(!window.claude||!window.claude.use)return;
+    const dbm=await window.claude.use('db'),user=await window.claude.use('user');
+    const id=user?await user.id():null;
+    if(!dbm||!id)return;
+    ref=dbm.collection('data/users/'+id).doc('calendario');
+    const snap=await ref.get();
+    if(snap.exists&&snap.data()){S=norm(snap.data());saveLocal();render()}
+    else if(Object.keys(S.shifts).length||S.events.length){dirty=true;flush()}
+    setNote('db');
+    ref.onSnapshot(s=>{
+      if(!s.exists||s.metadata.hasPendingWrites||writing||dirty)return;
+      const d=norm(s.data());
+      if(JSON.stringify(d)!==JSON.stringify(S)){S=d;saveLocal();render()}
+    },()=>{});
+  }catch(e){setNote('local')}
+})();
+</script>
+</body>
+</html>
